@@ -1339,6 +1339,86 @@ console.log(check({ name: "John", phone: "36-70-123-4567" }));
 
 >Please note: the custom function must return the `value`. It means you can also sanitize it.
 
+### Chaining custom functions and global definitions
+You can define the `custom` property as an array of functions, allowing you to chain various validation logics. 
+
+Additionally, you can define custom functions globally, making them reusable.
+```js
+
+let v = new Validator({
+	debug: true,
+	useNewCustomCheckerFunction: true,
+	messages: {
+		// Register our new error message text
+		evenNumber: "The '{field}' field must be an even number! Actual: {actual}",
+		realNumber: "The '{field}' field must be a real number! Actual: {actual}",
+		notPermitNumber: "The '{field}'  cannot have the value  {actual}",
+        compareGt: "The '{field}' field must be greater than {gt}! Actual: {actual}",
+        compareGte: "The '{field}' field must be greater than or equal to {gte}! Actual: {actual}",
+        compareLt: "The '{field}' field must be less than {lt}! Actual: {actual}",
+        compareLte: "The '{field}' field must be less than or equal to {lte}! Actual: {actual}"
+	},
+	customFunctions:{
+		even: (value, errors)=>{
+			if(value % 2 != 0 ){
+				errors.push({ type: "evenNumber",  actual: value });
+			}
+			return value;
+		},
+		real: (value, errors)=>{
+			if(value <0 ){
+				errors.push({ type: "realNumber",  actual: value });
+			}
+			return value;
+		},
+        compare: (value, errors, schema)=>{
+				if( typeof schema.custom.gt==="number" && value <= schema.custom.gt ){
+					errors.push({ type: "compareGt",  actual: value, gt: schema.custom.gt });
+				}
+				if( typeof schema.custom.gte==="number" && value < schema.custom.gte ){
+					errors.push({ type: "compareGte",  actual: value, gte: schema.custom.gte });
+				}
+				if( typeof schema.custom.lt==="number" && value >= schema.custom.lt ){
+					errors.push({ type: "compareLt",  actual: value, lt: schema.custom.lt });
+				}
+				if( typeof schema.custom.lte==="number" && value > schema.custom.lte ){
+					errors.push({ type: "compareLte",  actual: value, lte: schema.custom.lte });
+				}
+				return value;
+			}
+	}
+});
+
+
+
+const schema = {
+	people:{
+		type: "number",
+		custom: [
+            "compare|gte:-100|lt:200",  // extended definition with additional parameters - equal to: {type:"compare",gte:-100, lt:200}, 
+			"even",
+			"real",
+			function (value, errors){
+				if(value === "3" ){
+					errors.push({ type: "notPermitNumber",  actual: value });
+				}
+				return value;
+			}
+		]
+	}
+};
+
+console.log(v.validate({people:-200}, schema));
+console.log(v.validate({people:200}, schema));
+console.log(v.validate({people:5}, schema));
+console.log(v.validate({people:-5}, schema));
+console.log(v.validate({people:3}, schema));
+
+```
+
+
+
+
 ## Asynchronous custom validations
 You can also use async custom validators. This can be useful if you need to check something in a database or in a remote location.
 In this case you should use `async/await` keywords, or return a `Promise` in the custom validator functions.
@@ -1547,7 +1627,7 @@ Name                | Default text
 `dateMin`	| The '{field}' field must be greater than or equal to {expected}.
 `dateMax`	| The '{field}' field must be less than or equal to {expected}.
 `forbidden`	| The '{field}' field is forbidden.
-‍‍`email` | The '{field}' field must be a valid e-mail.
+`email` | The '{field}' field must be a valid e-mail.
 `emailEmpty` | The '{field}' field must not be empty.
 `emailMin` | The '{field}' field length must be greater than or equal to {expected} characters long.
 `emailMax` | The '{field}' field length must be less than or equal to {expected} characters long.
@@ -1570,6 +1650,20 @@ Name        | Description
 `field`     | The field name
 `expected`  | The expected value
 `actual`    | The actual value
+
+# Pass custom metas
+In some case, you will need to do something with the validation schema . 
+Like reusing the validator to pass custom settings, you can use properties starting with `$$`
+
+````typescript
+const check = v.compile({
+    $$name: 'Person',
+    $$description: 'write a description about this schema',
+    firstName: { type: "string" },
+    lastName: { type: "string" },
+    birthDate: { type: "date" }    
+});
+````
 
 # Development
 ```
